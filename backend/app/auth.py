@@ -15,9 +15,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/google")
 
 def verify_google_token(token: str) -> dict:
     # Hackathon Dev Bypass: Support mock tokens to ease local testing
-    if token == "mock_momo":
+    if "mock_momo" in token:
         return {"email": "momo.vendor@gmail.com", "iss": "accounts.google.com"}
-    elif token == "mock_chai":
+    elif "mock_chai" in token:
         return {"email": "chai.vendor@gmail.com", "iss": "accounts.google.com"}
 
     try:
