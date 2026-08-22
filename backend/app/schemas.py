@@ -103,6 +103,25 @@ class NearbyVendorResponse(BaseModel):
     rating: float
     distance_km: float
 
+class ReviewCreate(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field(None, max_length=500)
+
+class ReviewResponse(BaseModel):
+    id: UUID
+    customer_name: str
+    rating: int
+    comment: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class DemandCreate(BaseModel):
+    item_name: str = Field(..., min_length=2, max_length=50)
+    latitude: float
+    longitude: float
+
 class CustomerSearchResponse(BaseModel):
     vendor_id: UUID
     business_name: str
