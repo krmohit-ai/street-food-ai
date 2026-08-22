@@ -11,3 +11,5 @@ venv/
 data/
 
 # ML artifacts
+.env
+*.env

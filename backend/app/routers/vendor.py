@@ -407,9 +407,27 @@ def get_recommendations(
             f"• Prioritize stocking key ingredients for {categories_str} as demand is projected to spike within the hour."
         )
 
+    # 6. Fetch recent demand signals (Search logs in last 2 hours)
+    two_hours_ago = datetime.utcnow() - timedelta(hours=2)
+    recent_searches = db.query(
+        models.SearchLog.query.label("item_name"),
+        models.SearchLog.latitude,
+        models.SearchLog.longitude
+    ).filter(models.SearchLog.created_at >= two_hours_ago).all()
+
+    demand_hotspots = []
+    for s in recent_searches:
+        demand_hotspots.append({
+            "item_name": s.item_name.replace("DEMAND:", "").capitalize(),
+            "latitude": s.latitude,
+            "longitude": s.longitude,
+            "count": 1 # For demo, each log is 1 signal
+        })
+
     return {
         "vendor_id": current_vendor.id,
         "recommendations": top_3,
+        "demand_hotspots": demand_hotspots,
         "ai_advice": advice,
         "timestamp": datetime.utcnow()
     }
