@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-import bcrypt
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -9,18 +10,32 @@ from app.config import settings
 from app.database import get_db
 from app import models
 
-# OAuth2 scheme point
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+# OAuth2 scheme pointing to our Google Auth endpoint
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/google")
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_google_token(token: str) -> dict:
+    # Hackathon Dev Bypass: Support mock tokens to ease local testing
+    if token == "mock_momo":
+        return {"email": "momo.vendor@gmail.com", "iss": "accounts.google.com"}
+    elif token == "mock_chai":
+        return {"email": "chai.vendor@gmail.com", "iss": "accounts.google.com"}
+
     try:
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    except Exception:
-        return False
-
-def get_password_hash(password: str) -> str:
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+        # Verify the Google ID Token. audience=None allows verification
+        # without hardcoding specific Client IDs, suitable for hackathons/multiple clients.
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), audience=None)
+        
+        # Verify issuer is Google
+        if idinfo.get('iss') not in ['accounts.google.com', 'https://accounts.google.com']:
+            raise ValueError('Wrong issuer.')
+            
+        return idinfo
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Google ID Token verification failed: {e}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()

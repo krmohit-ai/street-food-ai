@@ -1,10 +1,17 @@
 import uuid
-from datetime import datetime
+import math
+import os
+import joblib
+import pandas as pd
+import google.generativeai as genai
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from redis import Redis
 from app.database import get_db, get_redis
 from app import models, schemas, auth
+from app.config import settings
 
 router = APIRouter(prefix="/vendor", tags=["Vendor Operations"])
 
@@ -178,5 +185,231 @@ def update_location(
 
     return {
         "message": "Location and status updated successfully",
+        "timestamp": datetime.utcnow()
+    }
+
+
+# --- Haversine Distance Helper ---
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0  # Earth's radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+
+# --- Spatial Grid Helpers ---
+MIN_LAT, MAX_LAT = 12.9250, 12.9450
+MIN_LON, MAX_LON = 77.6140, 77.6350
+LAT_STEP = 0.002
+LON_STEP = 0.0021
+
+def get_grid_coordinates(lat: float, lon: float):
+    grid_y = int((lat - MIN_LAT) / LAT_STEP)
+    grid_x = int((lon - MIN_LON) / LON_STEP)
+    grid_y = max(0, min(9, grid_y))
+    grid_x = max(0, min(9, grid_x))
+    return grid_y, grid_x
+
+def get_grid_center(grid_y: int, grid_x: int):
+    lat = MIN_LAT + (grid_y * LAT_STEP) + (LAT_STEP / 2)
+    lon = MIN_LON + (grid_x * LON_STEP) + (LON_STEP / 2)
+    return round(lat, 6), round(lon, 6)
+
+
+# --- Analytics Endpoint ---
+@router.get("/analytics")
+def get_analytics(
+    current_vendor: models.User = Depends(auth.get_current_vendor),
+    db: Session = Depends(get_db)
+):
+    # 1. Weekly Revenue (Last 7 Days)
+    today = datetime.utcnow().date()
+    seven_days_ago = today - timedelta(days=7)
+    
+    weekly_data = db.query(
+        func.date(models.Transaction.created_at).label("date"),
+        func.sum(models.Transaction.total_amount).label("revenue")
+    ).filter(
+        models.Transaction.vendor_profile_id == current_vendor.id,
+        models.Transaction.created_at >= seven_days_ago
+    ).group_by(
+        func.date(models.Transaction.created_at)
+    ).order_by(
+        "date"
+    ).all()
+    
+    weekly_revenue = [{"date": str(row.date), "revenue": float(row.revenue or 0)} for row in weekly_data]
+    
+    # 2. Hourly Sales (Today's sales volume hourly distribution)
+    hourly_data = db.query(
+        func.extract("hour", models.Transaction.created_at).label("hour"),
+        func.count(models.Transaction.id).label("count"),
+        func.sum(models.Transaction.total_amount).label("revenue")
+    ).filter(
+        models.Transaction.vendor_profile_id == current_vendor.id,
+        models.Transaction.created_at >= today
+    ).group_by(
+        func.extract("hour", models.Transaction.created_at)
+    ).all()
+    
+    hourly_sales = [{"hour": int(row.hour), "count": int(row.count), "revenue": float(row.revenue or 0)} for row in hourly_data]
+    
+    # 3. Category Distribution
+    category_data = db.query(
+        models.Product.category.label("category"),
+        func.sum(models.TransactionItem.quantity * models.TransactionItem.unit_price).label("sales")
+    ).select_from(models.TransactionItem).join(
+        models.Transaction, models.TransactionItem.transaction_id == models.Transaction.id
+    ).join(
+        models.Product, models.TransactionItem.product_id == models.Product.id
+    ).filter(
+        models.Transaction.vendor_profile_id == current_vendor.id
+    ).group_by(
+        models.Product.category
+    ).all()
+    
+    category_distribution = [{"category": row.category, "sales": float(row.sales or 0)} for row in category_data]
+    
+    # 4. Profit Margin (Total Revenue vs Total Expenses)
+    total_rev = db.query(func.sum(models.Transaction.total_amount)).filter(
+        models.Transaction.vendor_profile_id == current_vendor.id
+    ).scalar() or 0
+    
+    total_exp = db.query(func.sum(models.Expense.amount)).filter(
+        models.Expense.vendor_profile_id == current_vendor.id
+    ).scalar() or 0
+    
+    profit_margin = {
+        "total_revenue": float(total_rev),
+        "total_expenses": float(total_exp),
+        "net_profit": float(total_rev - total_exp)
+    }
+    
+    return {
+        "weekly_revenue": weekly_revenue,
+        "hourly_sales": hourly_sales,
+        "category_distribution": category_distribution,
+        "profit_margin": profit_margin
+    }
+
+
+# --- Recommendations (AI Demand Forecasting + Gemini API) ---
+MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../ml/models/xgboost_demand.joblib"))
+
+@router.get("/recommendations")
+def get_recommendations(
+    current_vendor: models.User = Depends(auth.get_current_vendor),
+    db: Session = Depends(get_db)
+):
+    profile = db.query(models.VendorProfile).filter(
+        models.VendorProfile.id == current_vendor.id
+    ).first()
+    
+    if not profile or profile.last_latitude is None or profile.last_longitude is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vendor profile details or current GPS location missing. Update location first."
+        )
+
+    # 1. Load forecasting model
+    if not os.path.exists(MODEL_PATH):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Forecasting model is not trained yet."
+        )
+    model = joblib.load(MODEL_PATH)
+
+    # 2. Get temporal parameters for next hour
+    now = datetime.utcnow()
+    next_hour = (now.hour + 1) % 24
+    day_of_week = now.weekday()
+
+    # 3. Get currently active supply in all cells
+    active_vendors = db.query(models.VendorProfile).filter(
+        models.VendorProfile.is_active == True
+    ).all()
+
+    supply_counts = {}
+    for v in active_vendors:
+        # Skip current vendor to see supply gap correctly
+        if v.id == current_vendor.id:
+            continue
+        if v.last_latitude is not None and v.last_longitude is not None:
+            gy, gx = get_grid_coordinates(v.last_latitude, v.last_longitude)
+            supply_counts[(gy, gx)] = supply_counts.get((gy, gx), 0) + 1
+
+    # 4. Forecast demand and rank all cells
+    recommendations_list = []
+    for gy in range(10):
+        for gx in range(10):
+            # Predict demand via model
+            input_df = pd.DataFrame([{
+                'grid_y': gy,
+                'grid_x': gx,
+                'hour': next_hour,
+                'day_of_week': day_of_week
+            }])
+            forecasted_demand = float(max(0.0, model.predict(input_df)[0]))
+            
+            # Competitors in this cell
+            supply = supply_counts.get((gy, gx), 0)
+            
+            # Score logic
+            score = forecasted_demand / (supply + 1)
+            
+            lat_center, lon_center = get_grid_center(gy, gx)
+            distance = calculate_distance(profile.last_latitude, profile.last_longitude, lat_center, lon_center)
+
+            recommendations_list.append({
+                "grid_y": gy,
+                "grid_x": gx,
+                "latitude": lat_center,
+                "longitude": lon_center,
+                "forecasted_demand": forecasted_demand,
+                "active_competitors": supply,
+                "score": score,
+                "distance_km": round(distance, 2)
+            })
+
+    # Sort descending by gap score
+    recommendations_list.sort(key=lambda x: x["score"], reverse=True)
+    top_3 = recommendations_list[:3]
+
+    # 5. Gemini API advice generation
+    if settings.GEMINI_API_KEY:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        
+    categories = [p.category for p in profile.products]
+    categories_str = ", ".join(set(categories)) if categories else "snacks"
+    
+    prompt = f"""
+    You are an AI street-food business advisor in India. A vendor with the business '{profile.business_name}' selling '{categories_str}' is asking for moving and inventory advice.
+    Here is our demand forecasting and market density data for the upcoming hour:
+    1. Hotspot 1 (Lat: {top_3[0]['latitude']}, Lon: {top_3[0]['longitude']}): Estimated demand is Rs {top_3[0]['forecasted_demand']:.0f}, with {top_3[0]['active_competitors']} competitors nearby. Distance is {top_3[0]['distance_km']:.2f} km.
+    2. Hotspot 2 (Lat: {top_3[1]['latitude']}, Lon: {top_3[1]['longitude']}): Estimated demand is Rs {top_3[1]['forecasted_demand']:.0f}, with {top_3[1]['active_competitors']} competitors nearby. Distance is {top_3[1]['distance_km']:.2f} km.
+    
+    Provide 2-3 bulleted, concise, actionable business recommendations (e.g. where to shift, what inventory prep to prioritize) for the vendor. Limit output to under 100 words. Keep tone encouraging and helpful.
+    """
+
+    try:
+        if settings.GEMINI_API_KEY:
+            gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            response = gemini_model.generate_content(prompt)
+            advice = response.text.strip()
+        else:
+            raise ValueError("No API key")
+    except Exception:
+        # Fallback advice if Gemini API fails or key is missing
+        advice = (
+            f"• High demand of Rs {top_3[0]['forecasted_demand']:.0f} detected at Hotspot 1 (Lat: {top_3[0]['latitude']}, Lon: {top_3[0]['longitude']}), just {top_3[0]['distance_km']:.2f} km away. It has zero competitive density.\n"
+            f"• Prioritize stocking key ingredients for {categories_str} as demand is projected to spike within the hour."
+        )
+
+    return {
+        "vendor_id": current_vendor.id,
+        "recommendations": top_3,
+        "ai_advice": advice,
         "timestamp": datetime.utcnow()
     }

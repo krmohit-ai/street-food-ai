@@ -28,8 +28,7 @@ def seed_data():
     # 1. Create Momo Vendor
     momo_user = models.User(
         id=uuid.uuid4(),
-        phone="9876543210",
-        password_hash=auth.get_password_hash("password123"),
+        email="momo.vendor@gmail.com",
         role="vendor"
     )
     db.add(momo_user)
@@ -51,8 +50,7 @@ def seed_data():
     # 2. Create Chai Vendor
     chai_user = models.User(
         id=uuid.uuid4(),
-        phone="9876543211",
-        password_hash=auth.get_password_hash("password123"),
+        email="chai.vendor@gmail.com",
         role="vendor"
     )
     db.add(chai_user)

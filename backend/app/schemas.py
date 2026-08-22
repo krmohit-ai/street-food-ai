@@ -5,28 +5,23 @@ from typing import List, Optional
 
 # --- Authentication Schemas ---
 
-class UserCreate(BaseModel):
-    phone: str = Field(..., min_length=10, max_length=15, description="Vendor or Customer phone number")
-    password: str = Field(..., min_length=6, description="Minimum 6 characters password")
-    role: str = Field(..., description="'vendor' or 'customer'")
-    business_name: Optional[str] = Field(None, description="Required if role is 'vendor'")
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(..., description="Google ID Token JWT")
+    role: Optional[str] = Field(None, description="'vendor' or 'customer' (required only for registration)")
+    business_name: Optional[str] = Field(None, description="Required if role is 'vendor' and registering")
 
 class UserResponse(BaseModel):
     id: UUID
-    phone: str
+    email: str
     role: str
     created_at: datetime
 
     class Config:
         from_attributes = True
 
-class UserLogin(BaseModel):
-    phone: str
-    password: str
-
 class TokenUser(BaseModel):
     id: UUID
-    phone: str
+    email: str
     role: str
 
     class Config:
