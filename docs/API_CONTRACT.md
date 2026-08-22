@@ -26,47 +26,26 @@ All errors return standard HTTP status codes accompanied by this JSON structure:
 
 ## 2. Authentication API
 
-### Register Account
-- **Endpoint**: `POST /auth/register`
+### Google Sign-In (Registration & Login)
+- **Endpoint**: `POST /auth/google`
 - **Auth Required**: No
 - **Request Body**:
   ```json
   {
-    "phone": "9876543210",
-    "password": "Password123",
+    "id_token": "mock_momo",
     "role": "vendor",
     "business_name": "Koramangala Momo Spot"
   }
   ```
-- **Response** (`201 Created`):
-  ```json
-  {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "phone": "9876543210",
-    "role": "vendor",
-    "business_name": "Koramangala Momo Spot",
-    "created_at": "2026-08-22T10:00:00Z"
-  }
-  ```
-
-### Login Account
-- **Endpoint**: `POST /auth/login`
-- **Auth Required**: No
-- **Request Body**:
-  ```json
-  {
-    "phone": "9876543210",
-    "password": "Password123"
-  }
-  ```
+  *(Note: For testing locally without real Firebase accounts, use "mock_momo" or "mock_chai" as the `id_token` to bypass signature verification.)*
 - **Response** (`200 OK`):
   ```json
   {
     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "token_type": "bearer",
     "user": {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "phone": "9876543210",
+      "id": "1cdd4932-45ee-4732-82fe-65b18f6c8609",
+      "email": "momo.vendor@gmail.com",
       "role": "vendor"
     }
   }
@@ -92,10 +71,10 @@ All errors return standard HTTP status codes accompanied by this JSON structure:
     },
     {
       "id": "789e4567-e89b-12d3-a456-426614174222",
-      "name": "Masala Chai",
-      "description": "Indian ginger tea",
-      "price": 15.00,
-      "category": "beverages",
+      "name": "Fried Momos",
+      "description": "Crispy fried veg momos",
+      "price": 100.00,
+      "category": "snacks",
       "is_available": true
     }
   ]
@@ -116,7 +95,7 @@ All errors return standard HTTP status codes accompanied by this JSON structure:
 - **Response** (`201 Created`):
   ```json
   {
-    "id": "789e4567-e89b-12d3-a456-426614174333",
+    "id": "789e4567-e89b-12d3-a456-426614174222",
     "name": "Fried Momos",
     "description": "Crispy fried veg momos",
     "price": 100.00,
@@ -140,10 +119,6 @@ All errors return standard HTTP status codes accompanied by this JSON structure:
       {
         "product_id": "789e4567-e89b-12d3-a456-426614174111",
         "quantity": 2
-      },
-      {
-        "product_id": "789e4567-e89b-12d3-a456-426614174222",
-        "quantity": 1
       }
     ]
   }
@@ -151,10 +126,10 @@ All errors return standard HTTP status codes accompanied by this JSON structure:
 - **Response** (`201 Created`):
   ```json
   {
-    "transaction_id": "999e4567-e89b-12d3-a456-426614174999",
-    "total_amount": 175.00,
+    "transaction_id": "b02d8471-a477-448f-8d2b-6cd4d67399bf",
+    "total_amount": 160.00,
     "payment_method": "upi",
-    "created_at": "2026-08-22T10:45:00Z"
+    "created_at": "2026-08-22T06:15:30.124Z"
   }
   ```
 
@@ -164,161 +139,120 @@ All errors return standard HTTP status codes accompanied by this JSON structure:
 - **Request Body**:
   ```json
   {
-    "amount": 450.00,
-    "description": "Cabbage, Flour, and Spices",
+    "amount": 1500.00,
+    "description": "Vegetables, oil, and flour",
     "category": "raw_materials"
   }
   ```
 - **Response** (`201 Created`):
   ```json
   {
-    "id": "666e4567-e89b-12d3-a456-426614174666",
-    "amount": 450.00,
-    "description": "Cabbage, Flour, and Spices",
+    "id": "c88f1212-32b4-42f1-aa8e-4a6c2bb44e45",
+    "amount": 1500.00,
+    "description": "Vegetables, oil, and flour",
     "category": "raw_materials",
-    "created_at": "2026-08-22T08:00:00Z"
+    "created_at": "2026-08-22T06:20:00.125Z"
   }
   ```
 
 ---
 
-## 5. Location Tracking & Maps API
+## 5. Location and Status Updates
 
-### Update Vendor Location
+### Update Location & Active Status
 - **Endpoint**: `POST /vendor/location`
 - **Auth Required**: Yes (Vendor)
 - **Request Body**:
   ```json
   {
-    "latitude": 12.93524,
-    "longitude": 77.62453,
+    "latitude": 12.9352,
+    "longitude": 77.6245,
     "status": "open"
   }
   ```
+  *(Note: status can be "open", "closed", or "moving". Sending "closed" takes the vendor offline and clears their record from the live Redis map geostore.)*
 - **Response** (`200 OK`):
   ```json
   {
-    "message": "Location updated successfully",
-    "timestamp": "2026-08-22T10:50:00Z"
+    "message": "Location and status updated successfully",
+    "timestamp": "2026-08-22T06:40:12.028519Z"
   }
-  ```
-
-### Discover Nearby Vendors
-- **Endpoint**: `GET /customer/vendors`
-- **Auth Required**: No
-- **Query Parameters**:
-  - `latitude`: `12.9348` (Customer location)
-  - `longitude`: `77.6240`
-  - `radius`: `1.5` (km, optional, default: 2.0)
-- **Response** (`200 OK`):
-  ```json
-  [
-    {
-      "vendor_id": "123e4567-e89b-12d3-a456-426614174000",
-      "business_name": "Koramangala Momo Spot",
-      "status": "open",
-      "latitude": 12.93524,
-      "longitude": 77.62453,
-      "rating": 4.8,
-      "distance_km": 0.07
-    }
-  ]
-  ```
-
-### Customer Search Food
-- **Endpoint**: `GET /customer/search`
-- **Auth Required**: No
-- **Query Parameters**:
-  - `query`: `momos`
-  - `latitude`: `12.9348`
-  - `longitude`: `77.6240`
-- **Response** (`200 OK`):
-  - *Note*: Registers search telemetry in `search_logs` and returns matches.
-  ```json
-  [
-    {
-      "vendor_id": "123e4567-e89b-12d3-a456-426614174000",
-      "business_name": "Koramangala Momo Spot",
-      "status": "open",
-      "latitude": 12.93524,
-      "longitude": 77.62453,
-      "rating": 4.8
-    }
-  ]
   ```
 
 ---
 
 ## 6. Business Intelligence & AI API
 
-### Get AI Recommendations
+### Get AI Hotspot Recommendations
 - **Endpoint**: `GET /vendor/recommendations`
 - **Auth Required**: Yes (Vendor)
 - **Response** (`200 OK`):
   ```json
   {
-    "timestamp": "2026-08-22T10:50:00Z",
-    "location_recommendations": [
+    "vendor_id": "1cdd4932-45ee-4732-82fe-65b18f6c8609",
+    "recommendations": [
       {
-        "zone_name": "College Road Grid 4",
-        "latitude": 12.9388,
-        "longitude": 77.6292,
-        "opportunity_score": 92,
+        "grid_y": 3,
+        "grid_x": 3,
+        "latitude": 12.932,
+        "longitude": 77.62135,
+        "forecasted_demand": 2710.91,
         "active_competitors": 1,
-        "distance_km": 0.6
+        "score": 1355.45,
+        "distance_km": 0.49
       },
       {
-        "zone_name": "Main Market Corner",
-        "latitude": 12.9312,
-        "longitude": 77.6210,
-        "opportunity_score": 74,
-        "active_competitors": 4,
-        "distance_km": 0.8
-      }
-    ],
-    "inventory_recommendations": [
-      {
-        "product_name": "Steam Momos",
-        "predicted_demand_units": 130,
-        "current_raw_material_prep_suggested": "130 portions",
-        "confidence": "high"
+        "grid_y": 5,
+        "grid_x": 4,
+        "latitude": 12.936,
+        "longitude": 77.62345,
+        "forecasted_demand": 357.69,
+        "active_competitors": 0,
+        "score": 357.69,
+        "distance_km": 0.14
       },
       {
-        "product_name": "Masala Chai",
-        "predicted_demand_units": 150,
-        "current_raw_material_prep_suggested": "150 portions",
-        "confidence": "medium"
+        "grid_y": 5,
+        "grid_x": 0,
+        "latitude": 12.936,
+        "longitude": 77.61505,
+        "forecasted_demand": 73.55,
+        "active_competitors": 0,
+        "score": 73.55,
+        "distance_km": 1.03
       }
     ],
-    "ai_explanation": "Demand at College Road Grid 4 is surging due to students leaving campus (5 PM peak). Nearby competition is low (only 1 other cart active). Preparing 130 plates of momos is optimal to capture maximum sales without leaving waste."
+    "ai_advice": "• High demand of Rs 2711 detected at Hotspot 1 (Lat: 12.932, Lon: 77.62135), just 0.49 km away. It has zero competitive density.\n• Prioritize stocking key ingredients for snacks as demand is projected to spike within the hour.",
+    "timestamp": "2026-08-22T06:40:15.148980Z"
   }
   ```
 
-### Get Dashboard Analytics
+### Get Dashboard Analytics (Graph Data)
 - **Endpoint**: `GET /vendor/analytics`
 - **Auth Required**: Yes (Vendor)
-- **Query Parameters**:
-  - `range`: `weekly` (options: `daily`, `weekly`, `monthly`)
 - **Response** (`200 OK`):
   ```json
   {
-    "summary": {
-      "total_revenue": 14200.00,
-      "total_expenses": 5300.00,
-      "net_profit": 8900.00,
-      "profit_margin": 62.7
-    },
-    "sales_by_item": [
-      { "item_name": "Steam Momos", "quantity": 140, "revenue": 11200.00 },
-      { "item_name": "Masala Chai", "quantity": 200, "revenue": 3000.00 }
+    "weekly_revenue": [
+      { "date": "2026-08-15", "revenue": 20080.0 },
+      { "date": "2026-08-16", "revenue": 8760.0 },
+      { "date": "2026-08-17", "revenue": 10400.0 },
+      { "date": "2026-08-18", "revenue": 9220.0 },
+      { "date": "2026-08-19", "revenue": 8280.0 },
+      { "date": "2026-08-20", "revenue": 9080.0 },
+      { "date": "2026-08-21", "revenue": 15620.0 }
     ],
-    "chart_data": [
-      { "date": "2026-08-16", "revenue": 1800.00, "expenses": 600.00, "profit": 1200.00 },
-      { "date": "2026-08-17", "revenue": 2100.00, "expenses": 800.00, "profit": 1300.00 },
-      { "date": "2026-08-18", "revenue": 1900.00, "expenses": 700.00, "profit": 1200.00 },
-      { "date": "2026-08-19", "revenue": 2400.00, "expenses": 950.00, "profit": 1450.00 },
-      { "date": "2026-08-20", "revenue": 2600.00, "expenses": 1100.00, "profit": 1500.00 },
-      { "date": "2026-08-21", "revenue": 3400.00, "expenses": 1150.00, "profit": 2250.00 }
-    ]
+    "hourly_sales": [
+      { "hour": 17, "count": 15, "revenue": 1420.0 },
+      { "hour": 18, "count": 22, "revenue": 2040.0 }
+    ],
+    "category_distribution": [
+      { "category": "snacks", "sales": 2153500.0 }
+    ],
+    "profit_margin": {
+      "total_revenue": 2153500.0,
+      "total_expenses": 76090.0,
+      "net_profit": 2077410.0
+    }
   }
   ```
