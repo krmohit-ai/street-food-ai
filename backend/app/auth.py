@@ -19,6 +19,8 @@ def verify_google_token(token: str) -> dict:
         return {"email": "momo.vendor@gmail.com", "iss": "accounts.google.com"}
     elif "mock_chai" in token:
         return {"email": "chai.vendor@gmail.com", "iss": "accounts.google.com"}
+    elif "mock_customer" in token:
+        return {"email": "customer@gmail.com", "iss": "accounts.google.com"}
 
     try:
         # Verify the Google ID Token. audience=None allows verification
