@@ -79,7 +79,25 @@ fun AppNavigation() {
                 onNavigateToExpense = { navController.navigate(Screen.VendorExpense.route) },
                 onNavigateToRecommendations = { navController.navigate(Screen.VendorRecommendations.route) },
                 onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
-                onNavigateToLocationPicker = { navController.navigate(Screen.LocationPicker.route) }
+                onNavigateToLocationPicker = { navController.navigate(Screen.LocationPicker.route) },
+                onNavigateToReviews = { navController.navigate(Screen.VendorReviews.route) },
+                onNavigateToOnboarding = { navController.navigate(Screen.VendorOnboarding.route) }
+            )
+        }
+
+        composable(Screen.VendorOnboarding.route) {
+            val vendorViewModel: com.example.streetfoodai.ui.vendor.VendorViewModel = hiltViewModel()
+            com.example.streetfoodai.ui.vendor.VendorOnboardingScreen(
+                viewModel = vendorViewModel,
+                onComplete = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.VendorReviews.route) {
+            val vendorViewModel: com.example.streetfoodai.ui.vendor.VendorViewModel = hiltViewModel()
+            com.example.streetfoodai.ui.vendor.VendorReviewsScreen(
+                viewModel = vendorViewModel,
+                onBack = { navController.popBackStack() }
             )
         }
 

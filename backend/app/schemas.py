@@ -94,6 +94,31 @@ class LocationUpdate(BaseModel):
     longitude: float = Field(..., ge=-180, le=180)
     status: str = Field("open", description="open, closed, moving")
 
+class VendorProfileUpdate(BaseModel):
+    business_name: Optional[str] = None
+    description: Optional[str] = None
+    what_he_sells: Optional[str] = None
+    regularity: Optional[str] = "regular"
+    is_movable: Optional[bool] = True
+    typical_latitude: Optional[float] = None
+    typical_longitude: Optional[float] = None
+    approx_sales_per_day: Optional[float] = None
+
+class VendorProfileResponse(BaseModel):
+    id: UUID
+    business_name: str
+    description: Optional[str]
+    rating: float
+    what_he_sells: Optional[str]
+    regularity: Optional[str]
+    is_movable: bool
+    typical_latitude: Optional[float]
+    typical_longitude: Optional[float]
+    approx_sales_per_day: Optional[float]
+
+    class Config:
+        from_attributes = True
+
 class NearbyVendorResponse(BaseModel):
     vendor_id: UUID
     business_name: str

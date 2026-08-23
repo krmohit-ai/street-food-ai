@@ -8,14 +8,17 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.streetfoodai.data.model.LocationRecommendation
+import androidx.compose.ui.viewinterop.AndroidView
+import com.example.streetfoodai.data.model.Recommendation
+import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +27,18 @@ fun RecommendationDetailScreen(
     onBack: () -> Unit
 ) {
     val recommendations by viewModel.recommendations.collectAsState()
+    
+    val cartoDbTileSource = remember {
+        XYTileSource(
+            "CartoDB_Positron",
+            1, 20, 256, ".png",
+            arrayOf(
+                "https://a.basemaps.cartocdn.com/light_all/",
+                "https://b.basemaps.cartocdn.com/light_all/",
+                "https://c.basemaps.cartocdn.com/light_all/"
+            )
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -42,6 +57,42 @@ fun RecommendationDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Text("AI Demand Heatmap", style = MaterialTheme.typography.headlineSmall)
+                Card(modifier = Modifier.fillMaxWidth().height(250.dp).padding(top = 8.dp)) {
+                    AndroidView(
+                        factory = { context ->
+                            MapView(context).apply {
+                                setTileSource(cartoDbTileSource)
+                                setMultiTouchControls(true)
+                                controller.setZoom(14.0)
+                                controller.setCenter(GeoPoint(12.9348, 77.6240))
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        update = { mapView ->
+                            mapView.overlays.clear()
+                            recommendations?.demand_hotspots?.forEach { demand ->
+                                val marker = Marker(mapView)
+                                marker.position = GeoPoint(demand.latitude, demand.longitude)
+                                marker.title = "LIVE DEMAND: ${demand.item_name}"
+                                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                mapView.overlays.add(marker)
+                            }
+                            recommendations?.recommendations?.forEach { rec ->
+                                val marker = Marker(mapView)
+                                marker.position = GeoPoint(rec.latitude, rec.longitude)
+                                marker.title = "AI Hotspot: Score ${rec.score.toInt()}"
+                                marker.icon = mapView.context.getDrawable(android.R.drawable.ic_dialog_map)
+                                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                mapView.overlays.add(marker)
+                            }
+                            mapView.invalidate()
+                        }
+                    )
+                }
+            }
+
             item {
                 Text("Hotspot Recommendations", style = MaterialTheme.typography.headlineSmall)
                 Text("Ranked by highest profit potential", style = MaterialTheme.typography.bodySmall)
@@ -91,7 +142,7 @@ fun RecommendationDetailScreen(
 }
 
 @Composable
-fun HotspotCard(hotspot: LocationRecommendation) {
+fun HotspotCard(hotspot: Recommendation) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),

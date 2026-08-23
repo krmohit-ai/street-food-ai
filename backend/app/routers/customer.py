@@ -135,15 +135,37 @@ def post_review(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Logic to add review to DB (need to update models.py first usually)
-    # For now, let's keep it simple for the hackathon
-    return {
-        "id": uuid.uuid4(),
-        "customer_name": current_user.email.split("@")[0],
-        "rating": review.rating,
-        "comment": review.comment,
-        "created_at": datetime.utcnow()
-    }
+    # 1. Verify vendor exists
+    vendor = db.query(models.VendorProfile).filter(models.VendorProfile.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    # 2. Save review
+    new_review = models.Review(
+        vendor_profile_id=vendor_id,
+        customer_id=current_user.id,
+        rating=review.rating,
+        comment=review.comment
+    )
+    db.add(new_review)
+
+    # 3. Update vendor rating (average)
+    avg_rating = db.query(func.avg(models.Review.rating)).filter(
+        models.Review.vendor_profile_id == vendor_id
+    ).scalar() or review.rating
+
+    vendor.rating = float(avg_rating)
+
+    db.commit()
+    db.refresh(new_review)
+
+    return schemas.ReviewResponse(
+        id=new_review.id,
+        customer_name=current_user.email.split("@")[0],
+        rating=new_review.rating,
+        comment=new_review.comment,
+        created_at=new_review.created_at
+    )
 
 @router.post("/demand")
 def create_demand(

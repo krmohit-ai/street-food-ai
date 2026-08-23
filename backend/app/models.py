@@ -28,10 +28,31 @@ class VendorProfile(Base):
     last_location_updated_at = Column(DateTime(timezone=True), nullable=True)
     rating = Column(Numeric(3, 2), default=5.00, nullable=False)
 
+    # New Onboarding Fields
+    what_he_sells = Column(String(255), nullable=True) # comma separated categories or items
+    regularity = Column(String(20), default="regular", nullable=True) # 'regular', 'occasional'
+    is_movable = Column(Boolean, default=True, nullable=True)
+    typical_latitude = Column(Float, nullable=True)
+    typical_longitude = Column(Float, nullable=True)
+    approx_sales_per_day = Column(Numeric(10, 2), nullable=True)
+
     user = relationship("User", back_populates="vendor_profile")
     products = relationship("Product", back_populates="vendor_profile", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="vendor_profile")
     expenses = relationship("Expense", back_populates="vendor_profile", cascade="all, delete-orphan")
+    reviews = relationship("Review", back_populates="vendor_profile", cascade="all, delete-orphan")
+
+class Review(Base):
+    __tablename__ = "reviews"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    vendor_profile_id = Column(UUID(as_uuid=True), ForeignKey("vendor_profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    rating = Column(Integer, nullable=False)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    vendor_profile = relationship("VendorProfile", back_populates="reviews")
+    customer = relationship("User")
 
 class Product(Base):
     __tablename__ = "products"

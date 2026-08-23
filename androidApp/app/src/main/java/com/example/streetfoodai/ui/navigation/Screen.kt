@@ -12,4 +12,6 @@ sealed class Screen(val route: String) {
     object VendorRecommendations : Screen("vendor_recommendations")
     object Profile : Screen("profile")
     object LocationPicker : Screen("location_picker")
+    object VendorOnboarding : Screen("vendor_onboarding")
+    object VendorReviews : Screen("vendor_reviews")
 }

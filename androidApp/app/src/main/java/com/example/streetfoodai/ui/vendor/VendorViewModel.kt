@@ -39,6 +39,15 @@ class VendorViewModel @Inject constructor(
     private val _vendorStatus = MutableStateFlow("open")
     val vendorStatus: StateFlow<String> = _vendorStatus.asStateFlow()
 
+    private val _profile = MutableStateFlow<VendorProfileDto?>(null)
+    val profile: StateFlow<VendorProfileDto?> = _profile.asStateFlow()
+
+    private val _reviews = MutableStateFlow<List<ReviewDto>>(emptyList())
+    val reviews: StateFlow<List<ReviewDto>> = _reviews.asStateFlow()
+
+    private val _isOnboardingRequired = MutableStateFlow(false)
+    val isOnboardingRequired: StateFlow<Boolean> = _isOnboardingRequired.asStateFlow()
+
     // POS State
     val cart = mutableStateListOf<Pair<ProductDto, Int>>()
     val cartTotal: Double
@@ -48,6 +57,49 @@ class VendorViewModel @Inject constructor(
         getMenu()
         getAnalytics()
         getRecommendations()
+        getProfile()
+        getReviews()
+    }
+
+    fun getProfile() {
+        viewModelScope.launch {
+            try {
+                val response = repository.getProfile()
+                if (response.isSuccessful) {
+                    val p = response.body()
+                    _profile.value = p
+                    _isOnboardingRequired.value = p?.businessName.isNullOrBlank() || p?.whatHeSells.isNullOrBlank()
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun updateProfile(profile: VendorProfileDto) {
+        viewModelScope.launch {
+            _uiState.value = VendorUiState.Loading
+            try {
+                val response = repository.updateProfile(profile)
+                if (response.isSuccessful) {
+                    _profile.value = response.body()
+                    _uiState.value = VendorUiState.Success("Profile updated successfully")
+                } else {
+                    _uiState.value = VendorUiState.Error("Failed to update profile")
+                }
+            } catch (e: Exception) {
+                _uiState.value = VendorUiState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    fun getReviews() {
+        viewModelScope.launch {
+            try {
+                val response = repository.getReviews()
+                if (response.isSuccessful) {
+                    _reviews.value = response.body() ?: emptyList()
+                }
+            } catch (e: Exception) {}
+        }
     }
 
     fun getAnalytics(range: String = "weekly") {

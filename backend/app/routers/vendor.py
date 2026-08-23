@@ -136,6 +136,60 @@ def log_expense(
 
 # --- Location and Status updates ---
 
+@router.put("/profile", response_model=schemas.VendorProfileResponse)
+def update_profile(
+    profile_data: schemas.VendorProfileUpdate,
+    current_vendor: models.User = Depends(auth.get_current_vendor),
+    db: Session = Depends(get_db)
+):
+    profile = db.query(models.VendorProfile).filter(
+        models.VendorProfile.id == current_vendor.id
+    ).first()
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor profile not found."
+        )
+
+    for field, value in profile_data.model_dump(exclude_unset=True).items():
+        setattr(profile, field, value)
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+@router.get("/profile", response_model=schemas.VendorProfileResponse)
+def get_profile(
+    current_vendor: models.User = Depends(auth.get_current_vendor),
+    db: Session = Depends(get_db)
+):
+    profile = db.query(models.VendorProfile).filter(
+        models.VendorProfile.id == current_vendor.id
+    ).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile
+
+@router.get("/reviews", response_model=list[schemas.ReviewResponse])
+def get_vendor_reviews(
+    current_vendor: models.User = Depends(auth.get_current_vendor),
+    db: Session = Depends(get_db)
+):
+    reviews = db.query(models.Review).filter(
+        models.Review.vendor_profile_id == current_vendor.id
+    ).order_by(models.Review.created_at.desc()).all()
+
+    return [
+        schemas.ReviewResponse(
+            id=r.id,
+            customer_name=r.customer.email.split("@")[0] if r.customer else "Anonymous",
+            rating=r.rating,
+            comment=r.comment,
+            created_at=r.created_at
+        ) for r in reviews
+    ]
+
 @router.post("/location")
 def update_location(
     loc_data: schemas.LocationUpdate,
@@ -222,19 +276,28 @@ def get_grid_center(grid_y: int, grid_x: int):
 # --- Analytics Endpoint ---
 @router.get("/analytics")
 def get_analytics(
+    range: str = "weekly",
     current_vendor: models.User = Depends(auth.get_current_vendor),
     db: Session = Depends(get_db)
 ):
-    # 1. Weekly Revenue (Last 7 Days)
+    # 1. Revenue based on range
     today = datetime.utcnow().date()
-    seven_days_ago = today - timedelta(days=7)
+    start_date = today
+    if range == "daily":
+        start_date = today
+    elif range == "weekly":
+        start_date = today - timedelta(days=7)
+    elif range == "monthly":
+        start_date = today - timedelta(days=30)
+    elif range == "yearly":
+        start_date = today - timedelta(days=365)
     
     weekly_data = db.query(
         func.date(models.Transaction.created_at).label("date"),
         func.sum(models.Transaction.total_amount).label("revenue")
     ).filter(
         models.Transaction.vendor_profile_id == current_vendor.id,
-        models.Transaction.created_at >= seven_days_ago
+        models.Transaction.created_at >= start_date
     ).group_by(
         func.date(models.Transaction.created_at)
     ).order_by(
@@ -243,14 +306,14 @@ def get_analytics(
     
     weekly_revenue = [{"date": str(row.date), "revenue": float(row.revenue or 0)} for row in weekly_data]
     
-    # 2. Hourly Sales (Today's sales volume hourly distribution)
+    # 2. Hourly Sales (sales volume distribution in the range)
     hourly_data = db.query(
         func.extract("hour", models.Transaction.created_at).label("hour"),
         func.count(models.Transaction.id).label("count"),
         func.sum(models.Transaction.total_amount).label("revenue")
     ).filter(
         models.Transaction.vendor_profile_id == current_vendor.id,
-        models.Transaction.created_at >= today
+        models.Transaction.created_at >= start_date
     ).group_by(
         func.extract("hour", models.Transaction.created_at)
     ).all()
@@ -266,20 +329,23 @@ def get_analytics(
     ).join(
         models.Product, models.TransactionItem.product_id == models.Product.id
     ).filter(
-        models.Transaction.vendor_profile_id == current_vendor.id
+        models.Transaction.vendor_profile_id == current_vendor.id,
+        models.Transaction.created_at >= start_date
     ).group_by(
         models.Product.category
     ).all()
     
     category_distribution = [{"category": row.category, "sales": float(row.sales or 0)} for row in category_data]
     
-    # 4. Profit Margin (Total Revenue vs Total Expenses)
+    # 4. Profit Margin (Revenue vs Expenses in range)
     total_rev = db.query(func.sum(models.Transaction.total_amount)).filter(
-        models.Transaction.vendor_profile_id == current_vendor.id
+        models.Transaction.vendor_profile_id == current_vendor.id,
+        models.Transaction.created_at >= start_date
     ).scalar() or 0
     
     total_exp = db.query(func.sum(models.Expense.amount)).filter(
-        models.Expense.vendor_profile_id == current_vendor.id
+        models.Expense.vendor_profile_id == current_vendor.id,
+        models.Expense.created_at >= start_date
     ).scalar() or 0
     
     profit_margin = {
@@ -408,13 +474,18 @@ def get_recommendations(
             f"• Prioritize stocking key ingredients for {categories_str} as demand is projected to spike within the hour."
         )
 
-    # 6. Fetch recent demand signals (Search logs in last 2 hours)
+    # 6. Fetch recent demand signals (Search logs with 10-min delay for realism)
+    ten_mins_ago = datetime.utcnow() - timedelta(minutes=10)
     two_hours_ago = datetime.utcnow() - timedelta(hours=2)
+
     recent_searches = db.query(
         models.SearchLog.query.label("item_name"),
         models.SearchLog.latitude,
         models.SearchLog.longitude
-    ).filter(models.SearchLog.created_at >= two_hours_ago).all()
+    ).filter(
+        models.SearchLog.created_at >= two_hours_ago,
+        models.SearchLog.created_at <= ten_mins_ago
+    ).all()
 
     demand_hotspots = []
     for s in recent_searches:

@@ -9,9 +9,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,12 +29,21 @@ fun VendorDashboardScreen(
     onNavigateToExpense: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToLocationPicker: () -> Unit
+    onNavigateToLocationPicker: () -> Unit,
+    onNavigateToReviews: () -> Unit,
+    onNavigateToOnboarding: () -> Unit
 ) {
     val analytics by viewModel.analytics.collectAsState()
     val recommendations by viewModel.recommendations.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val vendorStatus by viewModel.vendorStatus.collectAsState()
+    val isOnboardingRequired by viewModel.isOnboardingRequired.collectAsState()
+
+    LaunchedEffect(isOnboardingRequired) {
+        if (isOnboardingRequired) {
+            onNavigateToOnboarding()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -94,7 +101,28 @@ fun VendorDashboardScreen(
             // Summary Card
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Business Performance", style = MaterialTheme.typography.titleMedium)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Business Performance", style = MaterialTheme.typography.titleMedium)
+                        var expanded by remember { mutableStateOf(false) }
+                        var selectedRange by remember { mutableStateOf("Weekly") }
+                        Box {
+                            TextButton(onClick = { expanded = true }) {
+                                Text(selectedRange)
+                            }
+                            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                listOf("Daily", "Weekly", "Monthly", "Yearly").forEach { range ->
+                                    DropdownMenuItem(
+                                        text = { Text(range) },
+                                        onClick = {
+                                            selectedRange = range
+                                            expanded = false
+                                            viewModel.getAnalytics(range.lowercase())
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
@@ -122,9 +150,9 @@ fun VendorDashboardScreen(
                     Text("Top Categories", style = MaterialTheme.typography.titleLarge)
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            data.category_distribution.forEach { cat ->
+                            for (cat in data.category_distribution) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(cat.category.replaceFirstChar { it.uppercase() })
+                                    Text(cat.category.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() })
                                     Text("₹${cat.sales.toInt()}", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                                 }
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -154,17 +182,25 @@ fun VendorDashboardScreen(
                 )
             }
 
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DashboardActionCard(
+                    title = "Reviews",
+                    icon = Icons.Default.AccountCircle,
+                    onClick = onNavigateToReviews,
+                    modifier = Modifier.weight(1f)
+                )
+                DashboardActionCard(
+                    title = "Menu",
+                    icon = Icons.Default.List,
+                    onClick = onNavigateToMenu,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
             DashboardActionCard(
                 title = "Update Location",
                 icon = Icons.Default.LocationOn,
                 onClick = onNavigateToLocationPicker,
-                modifier = Modifier.fillMaxWidth()
-            )
-            
-            DashboardActionCard(
-                title = "Manage Menu",
-                icon = Icons.Default.List,
-                onClick = onNavigateToMenu,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -196,7 +232,7 @@ fun VendorDashboardScreen(
                     )
                     
                     // 3. Live Demand Signals
-                    if (!recs.demand_hotspots.isNullOrEmpty()) {
+                    if (recs.demand_hotspots.isNotEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)

@@ -1,7 +1,7 @@
 package com.example.streetfoodai.util
 
 object Constants {
-    const val BASE_URL = "https://ensnare-strict-bountiful.ngrok-free.dev/api/"
+    const val BASE_URL = "https://street-food-ai-backend.onrender.com/api/"
     
     // Auth Endpoints
     const val LOGIN_URL = "auth/login"

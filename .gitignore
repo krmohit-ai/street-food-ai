@@ -13,3 +13,7 @@ data/
 # ML artifacts
 .env
 *.env
+
+secerets.txt
+cloud_deployment_guide.dev.md
+*.idea
