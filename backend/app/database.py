@@ -19,7 +19,7 @@ def get_db():
         db.close()
 
 # 2. Redis Cache Config
-redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
 
 def get_redis():
     try:
