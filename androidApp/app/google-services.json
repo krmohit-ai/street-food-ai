@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "514114549099-ckmt8c6cs6cdji0ol5o73kbn160il4d8.apps.googleusercontent.com",
+          "client_id": "514114549099-ubrd03gpg36fthtl8kpojq54pk4c43qo.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.streetfoodai",
-            "certificate_hash": "0478a47003020509cea57ccd955ffbe56f31a1a0"
+            "certificate_hash": "550bea8482ee2a3b2e0d1ce9ddf69a533021cfe9"
           }
         },
         {

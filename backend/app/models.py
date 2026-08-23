@@ -19,7 +19,7 @@ class User(Base):
 class VendorProfile(Base):
     __tablename__ = "vendor_profiles"
     id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    business_name = Column(String(100), nullable=False)
+    business_name = Column(String(100), nullable=True)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=False, nullable=False)
     status = Column(String(20), default="closed", nullable=False)  # 'open', 'closed', 'moving'

@@ -31,11 +31,6 @@ def google_login(login_data: schemas.GoogleLoginRequest, db: Session = Depends(g
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid role. Must be 'vendor' or 'customer'."
             )
-        if login_data.role == "vendor" and not login_data.business_name:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Business name is required for vendor registration."
-            )
 
         # Create new User
         user = models.User(
@@ -49,7 +44,7 @@ def google_login(login_data: schemas.GoogleLoginRequest, db: Session = Depends(g
         if login_data.role == "vendor":
             new_profile = models.VendorProfile(
                 id=user.id,
-                business_name=login_data.business_name,
+                business_name=login_data.business_name, # Can be None now
                 is_active=False,
                 status="closed",
                 rating=5.00

@@ -26,7 +26,6 @@ fun LoginScreen(
     val credentialManager = CredentialManager.create(context)
     
     var selectedRole by remember { mutableStateOf("vendor") }
-    var shopName by remember { mutableStateOf("") }
 
     var customMockId by remember { mutableStateOf("") }
     var mockBusinessName by remember { mutableStateOf("") }
@@ -60,11 +59,11 @@ fun LoginScreen(
                 Log.d("LoginScreen", "Received credential type: ${credential.type}")
                 
                 if (credential is GoogleIdTokenCredential) {
-                    viewModel.loginWithGoogle(credential.idToken, selectedRole, shopName.ifBlank { null })
+                    viewModel.loginWithGoogle(credential.idToken, selectedRole)
                 } else if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     // Fallback for some library versions
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    viewModel.loginWithGoogle(googleIdTokenCredential.idToken, selectedRole, shopName.ifBlank { null })
+                    viewModel.loginWithGoogle(googleIdTokenCredential.idToken, selectedRole)
                 } else {
                     Log.e("LoginScreen", "Unexpected credential type: ${credential.type}")
                     android.widget.Toast.makeText(context, "Unexpected login type", android.widget.Toast.LENGTH_SHORT).show()
@@ -99,18 +98,6 @@ fun LoginScreen(
             Spacer(modifier = Modifier.width(16.dp))
             RadioButton(selected = selectedRole == "customer", onClick = { selectedRole = "customer" })
             Text("Customer")
-        }
-
-        if (selectedRole == "vendor") {
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = shopName,
-                onValueChange = { shopName = it },
-                label = { Text("Shop / Business Name") },
-                placeholder = { Text("e.g. Koramangala Momo Spot") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
