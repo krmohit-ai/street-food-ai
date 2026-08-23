@@ -148,6 +148,7 @@ def post_review(
         comment=review.comment
     )
     db.add(new_review)
+    db.flush()
 
     # 3. Update vendor rating (average)
     avg_rating = db.query(func.avg(models.Review.rating)).filter(
