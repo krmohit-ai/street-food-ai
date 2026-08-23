@@ -106,7 +106,7 @@ class VendorProfileUpdate(BaseModel):
 
 class VendorProfileResponse(BaseModel):
     id: UUID
-    business_name: str
+    business_name: Optional[str] = None
     description: Optional[str]
     rating: float
     what_he_sells: Optional[str]
