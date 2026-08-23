@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from redis import Redis
 from app.database import get_db, get_redis
 from app import models, schemas, auth
@@ -169,7 +169,7 @@ def post_review(
 
 @router.get("/vendor/{vendor_id}/reviews", response_model=list[schemas.ReviewResponse])
 def get_vendor_reviews_customer(vendor_id: uuid.UUID, db: Session = Depends(get_db)):
-    reviews = db.query(models.Review).filter(
+    reviews = db.query(models.Review).options(joinedload(models.Review.customer)).filter(
         models.Review.vendor_profile_id == vendor_id
     ).order_by(models.Review.created_at.desc()).all()
 

@@ -7,7 +7,7 @@ import pandas as pd
 import google.generativeai as genai
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from redis import Redis
 from app.database import get_db, get_redis
@@ -176,7 +176,7 @@ def get_vendor_reviews(
     current_vendor: models.User = Depends(auth.get_current_vendor),
     db: Session = Depends(get_db)
 ):
-    reviews = db.query(models.Review).filter(
+    reviews = db.query(models.Review).options(joinedload(models.Review.customer)).filter(
         models.Review.vendor_profile_id == current_vendor.id
     ).order_by(models.Review.created_at.desc()).all()
 
@@ -189,6 +189,15 @@ def get_vendor_reviews(
             created_at=r.created_at
         ) for r in reviews
     ]
+
+@router.get("/transactions", response_model=list[schemas.TransactionResponse])
+def get_transaction_history(current_vendor: models.User = Depends(auth.get_current_vendor), db: Session = Depends(get_db)):
+    return db.query(models.Transaction).filter(models.Transaction.vendor_profile_id == current_vendor.id).order_by(models.Transaction.created_at.desc()).all()
+
+@router.get("/expenses", response_model=list[schemas.ExpenseResponse])
+def get_expense_history(current_vendor: models.User = Depends(auth.get_current_vendor), db: Session = Depends(get_db)):
+    return db.query(models.Expense).filter(models.Expense.vendor_profile_id == current_vendor.id).order_by(models.Expense.created_at.desc()).all()
+
 
 @router.post("/location")
 def update_location(
