@@ -121,7 +121,7 @@ class VendorProfileResponse(BaseModel):
 
 class NearbyVendorResponse(BaseModel):
     vendor_id: UUID
-    business_name: str
+    business_name: Optional[str] = None
     status: str
     latitude: float
     longitude: float
@@ -149,7 +149,7 @@ class DemandCreate(BaseModel):
 
 class CustomerSearchResponse(BaseModel):
     vendor_id: UUID
-    business_name: str
+    business_name: Optional[str] = None
     status: str
     latitude: float
     longitude: float

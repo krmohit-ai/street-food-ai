@@ -228,7 +228,7 @@ def update_location(
             f"vendor:status:{vendor_id_str}",
             mapping={
                 "status": loc_data.status,
-                "business_name": profile.business_name,
+                "business_name": profile.business_name or "New Vendor",
                 "rating": str(profile.rating),
                 "updated_at": datetime.utcnow().isoformat()
             }
