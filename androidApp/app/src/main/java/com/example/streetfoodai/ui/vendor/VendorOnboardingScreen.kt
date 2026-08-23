@@ -27,7 +27,15 @@ fun VendorOnboardingScreen(
     var step by remember { mutableIntStateOf(1) }
 
     val profile by viewModel.profile.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     
+    LaunchedEffect(uiState) {
+        if (uiState is VendorUiState.Success) {
+            onComplete()
+            viewModel.resetUiState()
+        }
+    }
+
     LaunchedEffect(profile) {
         profile?.let {
             businessName = it.businessName ?: ""
@@ -122,10 +130,16 @@ fun VendorOnboardingScreen(
                                     approxSalesPerDay = approxSales.toDoubleOrNull()
                                 )
                             )
-                            onComplete()
                         },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Complete Setup") }
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = uiState !is VendorUiState.Loading
+                    ) { 
+                        if (uiState is VendorUiState.Loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        } else {
+                            Text("Complete Setup") 
+                        }
+                    }
                     
                     TextButton(
                         onClick = { step = 2 },

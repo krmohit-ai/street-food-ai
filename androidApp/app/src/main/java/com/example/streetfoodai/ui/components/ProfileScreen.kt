@@ -5,20 +5,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.streetfoodai.ui.auth.AuthViewModel
+import com.example.streetfoodai.ui.vendor.VendorViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     authViewModel: AuthViewModel,
+    vendorViewModel: VendorViewModel,
     onBack: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToOnboarding: () -> Unit
 ) {
+    val profile by vendorViewModel.profile.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -43,10 +51,30 @@ fun ProfileScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(text = "StreetFood AI User", style = MaterialTheme.typography.headlineMedium)
-            Text(text = "prajwalshambharkar342@gmail.com", style = MaterialTheme.typography.bodyLarge)
+            Text(text = profile?.businessName ?: "New Vendor", style = MaterialTheme.typography.bodyLarge)
             
             Spacer(modifier = Modifier.height(32.dp))
             
+            if (profile != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onNavigateToOnboarding
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(text = "Business Profile", style = MaterialTheme.typography.titleMedium)
+                            Text(text = "Update what you sell, regularity, etc.", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "App Version", style = MaterialTheme.typography.labelSmall)

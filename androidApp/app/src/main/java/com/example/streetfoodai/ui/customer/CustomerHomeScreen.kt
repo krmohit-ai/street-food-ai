@@ -3,13 +3,12 @@ package com.example.streetfoodai.ui.customer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -110,6 +109,7 @@ fun CustomerHomeScreen(
                         marker.setOnMarkerClickListener { _, _ ->
                             selectedVendor = vendor
                             viewModel.fetchVendorMenu(vendor.vendor_id.toString())
+                            viewModel.fetchVendorReviews(vendor.vendor_id.toString())
                             showVendorSheet = true
                             true
                         }
@@ -145,24 +145,55 @@ fun CustomerHomeScreen(
 
     if (showVendorSheet && selectedVendor != null) {
         val menu by viewModel.selectedVendorMenu.collectAsState()
+        val reviews by viewModel.selectedVendorReviews.collectAsState()
+        var showReviewDialog by remember { mutableStateOf(false) }
+
         ModalBottomSheet(
             onDismissRequest = { showVendorSheet = false },
             sheetState = sheetState
         ) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Text(text = selectedVendor!!.business_name, style = MaterialTheme.typography.headlineMedium)
                 Text(text = "Rating: ${selectedVendor!!.rating} ⭐", style = MaterialTheme.typography.bodyLarge)
+                
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Menu", style = MaterialTheme.typography.titleLarge)
-                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
-                    items(menu) { item ->
-                        ListItem(
-                            headlineContent = { Text(item.name) },
-                            supportingContent = { Text(item.description ?: "") },
-                            trailingContent = { Text("₹${item.price}") }
-                        )
+                
+                // Tabs for Menu and Reviews
+                var selectedTab by remember { mutableIntStateOf(0) }
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Menu") })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Reviews") })
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (selectedTab == 0) {
+                    Column {
+                        menu.forEach { item ->
+                            ListItem(
+                                headlineContent = { Text(item.name) },
+                                supportingContent = { Text(item.description ?: "") },
+                                trailingContent = { Text("₹${item.price}") }
+                            )
+                        }
+                        if (menu.isEmpty()) Text("No items listed.", modifier = Modifier.padding(16.dp))
+                    }
+                } else {
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Customer Feedback", style = MaterialTheme.typography.titleMedium)
+                            TextButton(onClick = { showReviewDialog = true }) {
+                                Text("Add Review")
+                            }
+                        }
+                        reviews.forEach { review ->
+                            com.example.streetfoodai.ui.vendor.ReviewItem(review = review)
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                        if (reviews.isEmpty()) Text("Be the first to review!", modifier = Modifier.padding(16.dp))
                     }
                 }
+
                 Button(
                     onClick = {
                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, 
@@ -175,6 +206,46 @@ fun CustomerHomeScreen(
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }
+        }
+
+        if (showReviewDialog) {
+            var rating by remember { mutableIntStateOf(5) }
+            var comment by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { showReviewDialog = false },
+                title = { Text("Add Review") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Rate your experience:")
+                        Row {
+                            repeat(5) { index ->
+                                IconButton(onClick = { rating = index + 1 }) {
+                                    Icon(
+                                        Icons.Default.Star, 
+                                        contentDescription = null,
+                                        tint = if (index < rating) Color(0xFFFFB300) else Color.Gray
+                                    )
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = comment,
+                            onValueChange = { comment = it },
+                            label = { Text("Comment (optional)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.postReview(selectedVendor!!.vendor_id.toString(), rating, comment)
+                        showReviewDialog = false
+                    }) { Text("Post") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showReviewDialog = false }) { Text("Cancel") }
+                }
+            )
         }
     }
 

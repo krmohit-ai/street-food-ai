@@ -167,6 +167,22 @@ def post_review(
         created_at=new_review.created_at
     )
 
+@router.get("/vendor/{vendor_id}/reviews", response_model=list[schemas.ReviewResponse])
+def get_vendor_reviews_customer(vendor_id: uuid.UUID, db: Session = Depends(get_db)):
+    reviews = db.query(models.Review).filter(
+        models.Review.vendor_profile_id == vendor_id
+    ).order_by(models.Review.created_at.desc()).all()
+
+    return [
+        schemas.ReviewResponse(
+            id=r.id,
+            customer_name=r.customer.email.split("@")[0] if r.customer else "Anonymous",
+            rating=r.rating,
+            comment=r.comment,
+            created_at=r.created_at
+        ) for r in reviews
+    ]
+
 @router.post("/demand")
 def create_demand(
     demand: schemas.DemandCreate,

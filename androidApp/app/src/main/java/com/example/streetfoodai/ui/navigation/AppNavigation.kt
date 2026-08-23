@@ -151,14 +151,17 @@ fun AppNavigation() {
 
         composable(Screen.Profile.route) {
             val authViewModel: AuthViewModel = hiltViewModel()
+            val vendorViewModel: com.example.streetfoodai.ui.vendor.VendorViewModel = hiltViewModel()
             com.example.streetfoodai.ui.components.ProfileScreen(
                 authViewModel = authViewModel,
+                vendorViewModel = vendorViewModel,
                 onBack = { navController.popBackStack() },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                onNavigateToOnboarding = { navController.navigate(Screen.VendorOnboarding.route) }
             )
         }
     }

@@ -68,7 +68,7 @@ class VendorViewModel @Inject constructor(
                 if (response.isSuccessful) {
                     val p = response.body()
                     _profile.value = p
-                    _isOnboardingRequired.value = p?.businessName.isNullOrBlank() || p?.whatHeSells.isNullOrBlank()
+                    _isOnboardingRequired.value = p?.businessName.isNullOrBlank()
                 }
             } catch (e: Exception) {}
         }
@@ -81,6 +81,7 @@ class VendorViewModel @Inject constructor(
                 val response = repository.updateProfile(profile)
                 if (response.isSuccessful) {
                     _profile.value = response.body()
+                    _isOnboardingRequired.value = false
                     _uiState.value = VendorUiState.Success("Profile updated successfully")
                 } else {
                     _uiState.value = VendorUiState.Error("Failed to update profile")
