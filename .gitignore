@@ -17,3 +17,4 @@ data/
 secerets.txt
 cloud_deployment_guide.dev.md
 *.idea
+google-services.json
